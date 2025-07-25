@@ -106,6 +106,16 @@
             height: 30px;
             margin-left: 4px; /* Optical alignment */
         }
+        /* Style for the filter dropdown */
+        #group-filter {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: #3a3a3c;
+            color: #f2f2f7;
+            border: 1px solid #444;
+            margin-bottom: 16px;
+        }
     </style>
 </head>
 <body class="bg-black">
@@ -116,71 +126,149 @@
             <p class="text-gray-400">Your chronological feed of friends and groups.</p>
         </header>
 
+        <!-- NEW: Dropdown for filtering by group -->
+        <div id="filter-container">
+             <select id="group-filter" class="hidden">
+                <!-- Options will be populated by JavaScript -->
+             </select>
+        </div>
+
         <!-- Container for the feed items -->
         <main id="feed-container">
             <!-- Loading message will be shown initially -->
             <div id="loading-message" class="text-center text-gray-400 py-10">Loading your feed...</div>
         </main>
+
+        <!-- NEW: Loading indicator for infinite scroll -->
+        <div id="infinite-load-indicator" class="text-center text-gray-400 py-6 hidden">Loading more...</div>
     </div>
 
     <script>
-        // IMPORTANT: Replace with your actual App ID from your VK developer settings.
-        const APP_ID = 53964096; // <-- This was already updated.
+        // --- STATE MANAGEMENT ---
+        const APP_ID = 53964096; // Your App ID
+        let accessToken = null;
+        let nextFrom = ''; // Cursor for infinite scroll
+        let isLoading = false; // Prevents multiple simultaneous loads
+        let selectedGroupId = 'all'; // Currently selected filter
+
+        // --- DOM ELEMENTS ---
+        const feedContainer = document.getElementById('feed-container');
+        const loadingMessage = document.getElementById('loading-message');
+        const infiniteLoadIndicator = document.getElementById('infinite-load-indicator');
+        const groupFilter = document.getElementById('group-filter');
 
         // --- 1. INITIALIZE THE MINI APP ---
         vkBridge.send('VKWebAppInit');
 
-        // --- 2. AUTHENTICATION AND FETCHING DATA ---
+        // --- 2. AUTHENTICATION AND INITIAL DATA FETCH ---
         async function startApp() {
             if (APP_ID === 0) {
-                document.getElementById('loading-message').innerText = 'Error: Please set your APP_ID in the script.';
+                loadingMessage.innerText = 'Error: Please set your APP_ID in the script.';
                 return;
             }
-
             try {
                 const tokenData = await vkBridge.send('VKWebAppGetAuthToken', {
                     app_id: APP_ID,
                     scope: 'friends,wall,groups,video'
                 });
-
-                if (tokenData.access_token) {
-                    fetchNewsfeed(tokenData.access_token);
+                accessToken = tokenData.access_token;
+                if (accessToken) {
+                    await fetchUserGroups(); // Fetch groups for the filter
+                    await fetchNewsfeed(true); // Fetch initial feed
                 }
             } catch (error) {
                 console.error('Auth Error:', error);
-                document.getElementById('loading-message').innerText = 'Could not get authorization.';
+                loadingMessage.innerText = 'Could not get authorization.';
             }
         }
 
-        // --- 3. FETCH THE NEWS FEED FROM VK API ---
-        async function fetchNewsfeed(accessToken) {
+        // --- 3. FETCH USER'S GROUPS FOR THE FILTER ---
+        async function fetchUserGroups() {
             try {
-                const feedData = await vkBridge.send('VKWebAppCallAPIMethod', {
-                    method: 'newsfeed.get',
+                const groupsData = await vkBridge.send('VKWebAppCallAPIMethod', {
+                    method: 'groups.get',
                     params: {
                         access_token: accessToken,
-                        filters: 'post,photo,video',
-                        count: 50,
-                        extended: 1,
+                        extended: 1, // Get full info
+                        fields: 'name,photo_50',
                         v: '5.131'
                     }
                 });
-                
-                document.getElementById('loading-message').style.display = 'none';
-                renderFeed(feedData.response);
-
+                populateGroupFilter(groupsData.response.items);
             } catch (error) {
-                console.error('API Error:', error);
-                document.getElementById('loading-message').innerText = 'Failed to load feed data.';
+                console.error('Failed to fetch groups:', error);
             }
         }
 
-        // --- 4. RENDER THE FEED ON THE SCREEN ---
+        // --- 4. POPULATE THE DROPDOWN FILTER ---
+        function populateGroupFilter(groups) {
+            groupFilter.innerHTML = '<option value="all">All Feeds</option>'; // Default option
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                groupFilter.appendChild(option);
+            });
+            groupFilter.classList.remove('hidden'); // Show the filter
+        }
+
+        // --- 5. FETCH THE NEWS FEED FROM VK API (REFACTORED) ---
+        async function fetchNewsfeed(isNewSearch = false) {
+            if (isLoading) return; // Don't fetch if already loading
+            isLoading = true;
+
+            if (isNewSearch) {
+                feedContainer.innerHTML = ''; // Clear feed for new search
+                nextFrom = ''; // Reset pagination
+                loadingMessage.classList.remove('hidden');
+            } else {
+                infiniteLoadIndicator.classList.remove('hidden'); // Show "Loading more..."
+            }
+
+            const params = {
+                access_token: accessToken,
+                filters: 'post,photo,video',
+                count: 30, // Get 30 items at a time
+                extended: 1,
+                v: '5.131'
+            };
+
+            // Add pagination cursor if it exists
+            if (nextFrom) {
+                params.start_from = nextFrom;
+            }
+
+            // Add group filter if a group is selected
+            if (selectedGroupId !== 'all') {
+                // The 'g' prefix is required by the API for group source_ids
+                params.source_ids = 'g' + selectedGroupId;
+            }
+
+            try {
+                const feedData = await vkBridge.send('VKWebAppCallAPIMethod', {
+                    method: 'newsfeed.get',
+                    params: params
+                });
+
+                if (feedData.response) {
+                    renderFeed(feedData.response);
+                    nextFrom = feedData.response.next_from; // Update cursor for next load
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                feedContainer.innerHTML += '<div class="text-center text-red-400 py-10">Failed to load feed data.</div>';
+            } finally {
+                isLoading = false;
+                loadingMessage.classList.add('hidden');
+                infiniteLoadIndicator.classList.add('hidden');
+            }
+        }
+
+        // --- 6. RENDER THE FEED ON THE SCREEN (APPENDS ITEMS) ---
         function renderFeed(response) {
-            const feedContainer = document.getElementById('feed-container');
             const { items, profiles, groups } = response;
 
-            if (items.length === 0) {
+            if (items.length === 0 && feedContainer.innerHTML === '') {
                 feedContainer.innerHTML = '<div class="text-center text-gray-400 py-10">Nothing new to show.</div>';
                 return;
             }
@@ -200,37 +288,22 @@
                 const postDate = new Date(item.date * 1000).toLocaleString();
                 let contentHTML = '';
 
-                // Helper function to render a video
                 const renderVideo = (videoObject) => {
                     if (videoObject.player) {
-                        return `
-                            <div class="post-video-container">
-                                <iframe src="${videoObject.player}" frameborder="0" allowfullscreen></iframe>
-                            </div>`;
-                    } 
-                    else if (videoObject.image) {
+                        return `<div class="post-video-container"><iframe src="${videoObject.player}" frameborder="0" allowfullscreen></iframe></div>`;
+                    } else if (videoObject.image) {
                         const videoLink = `https://vk.com/video${videoObject.owner_id}_${videoObject.id}`;
                         const bestThumbnail = videoObject.image.sort((a, b) => b.width - a.width)[0];
-                        return `
-                            <a href="${videoLink}" target="_blank" class="video-thumbnail-link">
-                                <img src="${bestThumbnail.url}" class="post-image" alt="Video thumbnail">
-                                <div class="play-icon">
-                                    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
-                                </div>
-                            </a>`;
+                        return `<a href="${videoLink}" target="_blank" class="video-thumbnail-link"><img src="${bestThumbnail.url}" class="post-image" alt="Video thumbnail"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></div></a>`;
                     }
                     return '';
                 };
 
-                // Handle standard posts
                 if (item.type === 'post') {
-                    if (item.text) {
-                        contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
-                    }
+                    if (item.text) contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
                     if (item.attachments) {
                         const photo = item.attachments.find(att => att.type === 'photo');
                         const video = item.attachments.find(att => att.type === 'video');
-
                         if (photo) {
                             const bestSize = photo.photo.sizes.sort((a, b) => b.width - a.width)[0];
                             contentHTML += `<img src="${bestSize.url}" class="post-image" alt="Post attachment">`;
@@ -238,42 +311,37 @@
                             contentHTML += renderVideo(video.video);
                         }
                     }
-                }
-
-                // Handle direct photo uploads
-                if (item.type === 'photo') {
-                     if (item.photos && item.photos.items.length > 0) {
-                        const photoItem = item.photos.items[0];
-                        const bestSize = photoItem.sizes.sort((a, b) => b.width - a.width)[0];
-                        contentHTML += `<img src="${bestSize.url}" class="post-image" alt="New photo">`;
-                     }
-                }
-
-                // Handle direct video uploads
-                if (item.type === 'video') {
-                    if (item.video && item.video.items.length > 0) {
-                        const videoItem = item.video.items[0];
-                        contentHTML += renderVideo(videoItem);
-                    }
+                } else if (item.type === 'photo' && item.photos) {
+                    const photoItem = item.photos.items[0];
+                    const bestSize = photoItem.sizes.sort((a, b) => b.width - a.width)[0];
+                    contentHTML += `<img src="${bestSize.url}" class="post-image" alt="New photo">`;
+                } else if (item.type === 'video' && item.video) {
+                    contentHTML += renderVideo(item.video.items[0]);
                 }
 
                 if (contentHTML) {
-                    card.innerHTML = `
-                        <div class="card-header">
-                            <img src="${author.photo_100 || author.photo_200}" class="avatar" alt="Author avatar">
-                            <div>
-                                <div class="author-name">${author.name || (author.first_name + ' ' + author.last_name)}</div>
-                                <div class="post-date">${postDate}</div>
-                            </div>
-                        </div>
-                        ${contentHTML}
-                    `;
+                    card.innerHTML = `<div class="card-header"><img src="${author.photo_100 || author.photo_200}" class="avatar" alt="Author avatar"><div><div class="author-name">${author.name || (author.first_name + ' ' + author.last_name)}</div><div class="post-date">${postDate}</div></div></div>${contentHTML}`;
                     feedContainer.appendChild(card);
                 }
             });
         }
 
-        // Start the application logic
+        // --- 7. EVENT LISTENERS ---
+        // Listen for changes on the group filter
+        groupFilter.addEventListener('change', (event) => {
+            selectedGroupId = event.target.value;
+            fetchNewsfeed(true); // Trigger a new search
+        });
+
+        // Listen for scrolling to trigger infinite load
+        window.addEventListener('scroll', () => {
+            // Check if user is near the bottom of the page
+            if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && !isLoading) {
+                fetchNewsfeed(false); // Fetch more items, not a new search
+            }
+        });
+
+        // Start the application
         startApp();
     </script>
 </body>
