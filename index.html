@@ -47,7 +47,7 @@
             margin-bottom: 10px;
             color: #e5e5ea; /* Main post text color */
         }
-        .post-image {
+        .post-image, .video-thumbnail-image {
             width: 100%;
             border-radius: 8px;
             margin-top: 10px;
@@ -85,6 +85,10 @@
             height: 100%;
             background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
+            transition: background-color 0.2s ease;
+        }
+        .video-thumbnail-link:hover::after {
+             background: rgba(0, 0, 0, 0.1);
         }
         .play-icon {
             position: absolute;
@@ -126,20 +130,12 @@
             <p class="text-gray-400">Your chronological feed of friends and groups.</p>
         </header>
 
-        <!-- NEW: Dropdown for filtering by group -->
         <div id="filter-container">
-             <select id="group-filter" class="hidden">
-                <!-- Options will be populated by JavaScript -->
-             </select>
+             <select id="group-filter" class="hidden"></select>
         </div>
 
-        <!-- Container for the feed items -->
-        <main id="feed-container">
-            <!-- Loading message will be shown initially -->
-            <div id="loading-message" class="text-center text-gray-400 py-10">Loading your feed...</div>
-        </main>
+        <main id="feed-container"></main>
 
-        <!-- NEW: Loading indicator for infinite scroll -->
         <div id="infinite-load-indicator" class="text-center text-gray-400 py-6 hidden">Loading more...</div>
     </div>
 
@@ -147,13 +143,14 @@
         // --- STATE MANAGEMENT ---
         const APP_ID = 53964096; // Your App ID
         let accessToken = null;
-        let nextFrom = ''; // Cursor for infinite scroll
-        let isLoading = false; // Prevents multiple simultaneous loads
-        let selectedGroupId = 'all'; // Currently selected filter
+        let newsfeedNextFrom = ''; // Cursor for newsfeed.get
+        let videoOffset = 0; // Offset for video.get
+        let isLoading = false;
+        let selectedGroupId = 'all';
+        let userGroups = [];
 
         // --- DOM ELEMENTS ---
         const feedContainer = document.getElementById('feed-container');
-        const loadingMessage = document.getElementById('loading-message');
         const infiniteLoadIndicator = document.getElementById('infinite-load-indicator');
         const groupFilter = document.getElementById('group-filter');
 
@@ -162,23 +159,16 @@
 
         // --- 2. AUTHENTICATION AND INITIAL DATA FETCH ---
         async function startApp() {
-            if (APP_ID === 0) {
-                loadingMessage.innerText = 'Error: Please set your APP_ID in the script.';
-                return;
-            }
             try {
-                const tokenData = await vkBridge.send('VKWebAppGetAuthToken', {
-                    app_id: APP_ID,
-                    scope: 'friends,wall,groups,video'
-                });
+                const tokenData = await vkBridge.send('VKWebAppGetAuthToken', { app_id: APP_ID, scope: 'friends,wall,groups,video' });
                 accessToken = tokenData.access_token;
                 if (accessToken) {
-                    await fetchUserGroups(); // Fetch groups for the filter
-                    await fetchNewsfeed(true); // Fetch initial feed
+                    await fetchUserGroups();
+                    await fetchContent(true);
                 }
             } catch (error) {
                 console.error('Auth Error:', error);
-                loadingMessage.innerText = 'Could not get authorization.';
+                feedContainer.innerHTML = '<div class="text-center text-red-400 py-10">Could not get authorization.</div>';
             }
         }
 
@@ -187,14 +177,10 @@
             try {
                 const groupsData = await vkBridge.send('VKWebAppCallAPIMethod', {
                     method: 'groups.get',
-                    params: {
-                        access_token: accessToken,
-                        extended: 1, // Get full info
-                        fields: 'name,photo_50',
-                        v: '5.131'
-                    }
+                    params: { access_token: accessToken, extended: 1, fields: 'name,photo_50', v: '5.131' }
                 });
-                populateGroupFilter(groupsData.response.items);
+                userGroups = groupsData.response.items;
+                populateGroupFilter(userGroups);
             } catch (error) {
                 console.error('Failed to fetch groups:', error);
             }
@@ -202,142 +188,161 @@
 
         // --- 4. POPULATE THE DROPDOWN FILTER ---
         function populateGroupFilter(groups) {
-            groupFilter.innerHTML = '<option value="all">All Feeds</option>'; // Default option
+            groupFilter.innerHTML = '<option value="all">All Feeds</option>';
             groups.forEach(group => {
                 const option = document.createElement('option');
                 option.value = group.id;
                 option.textContent = group.name;
                 groupFilter.appendChild(option);
             });
-            groupFilter.classList.remove('hidden'); // Show the filter
+            groupFilter.classList.remove('hidden');
         }
-
-        // --- 5. FETCH THE NEWS FEED FROM VK API (REFACTORED) ---
-        async function fetchNewsfeed(isNewSearch = false) {
-            if (isLoading) return; // Don't fetch if already loading
+        
+        // --- 5. MASTER FETCH FUNCTION (Decides which API to call) ---
+        async function fetchContent(isNewSearch = false) {
+            if (isLoading) return;
             isLoading = true;
 
             if (isNewSearch) {
-                feedContainer.innerHTML = ''; // Clear feed for new search
-                nextFrom = ''; // Reset pagination
-                loadingMessage.classList.remove('hidden');
+                feedContainer.innerHTML = ''; // Clear previous content
+                newsfeedNextFrom = ''; // Reset newsfeed pagination
+                videoOffset = 0; // Reset video pagination
+            }
+
+            // Show appropriate loading indicator
+            const loadingIndicator = isNewSearch ? document.createElement('div') : infiniteLoadIndicator;
+            if (isNewSearch) {
+                loadingIndicator.className = 'text-center text-gray-400 py-10';
+                loadingIndicator.textContent = 'Loading...';
+                feedContainer.appendChild(loadingIndicator);
             } else {
-                infiniteLoadIndicator.classList.remove('hidden'); // Show "Loading more..."
-            }
-
-            const params = {
-                access_token: accessToken,
-                filters: 'post,photo,video',
-                count: 30, // Get 30 items at a time
-                extended: 1,
-                v: '5.131'
-            };
-
-            // Add pagination cursor if it exists
-            if (nextFrom) {
-                params.start_from = nextFrom;
-            }
-
-            // Add group filter if a group is selected
-            if (selectedGroupId !== 'all') {
-                // The 'g' prefix is required by the API for group source_ids
-                params.source_ids = 'g' + selectedGroupId;
+                loadingIndicator.classList.remove('hidden');
             }
 
             try {
-                const feedData = await vkBridge.send('VKWebAppCallAPIMethod', {
-                    method: 'newsfeed.get',
-                    params: params
-                });
-
-                if (feedData.response) {
-                    renderFeed(feedData.response);
-                    nextFrom = feedData.response.next_from; // Update cursor for next load
+                if (selectedGroupId === 'all') {
+                    await fetchNewsfeedApi();
+                } else {
+                    await fetchCommunityVideosApi();
                 }
             } catch (error) {
-                console.error('API Error:', error);
-                feedContainer.innerHTML += '<div class="text-center text-red-400 py-10">Failed to load feed data.</div>';
+                console.error('Content Fetch Error:', error);
+                feedContainer.innerHTML = '<div class="text-center text-red-400 py-10">Failed to load data.</div>';
             } finally {
                 isLoading = false;
-                loadingMessage.classList.add('hidden');
-                infiniteLoadIndicator.classList.add('hidden');
+                if (isNewSearch) loadingIndicator.remove();
+                else loadingIndicator.classList.add('hidden');
             }
         }
 
-        // --- 6. RENDER THE FEED ON THE SCREEN (APPENDS ITEMS) ---
-        function renderFeed(response) {
-            const { items, profiles, groups } = response;
+        // --- 6. API CALLERS ---
+        async function fetchNewsfeedApi() {
+            const params = { access_token: accessToken, filters: 'post,photo,video', count: 30, extended: 1, v: '5.131' };
+            if (newsfeedNextFrom) params.start_from = newsfeedNextFrom;
 
+            const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'newsfeed.get', params });
+            if (data.response) {
+                renderNewsfeed(data.response);
+                newsfeedNextFrom = data.response.next_from;
+            }
+        }
+
+        async function fetchCommunityVideosApi() {
+            const params = {
+                access_token: accessToken,
+                owner_id: -parseInt(selectedGroupId), // Negative ID for communities
+                count: 50,
+                offset: videoOffset,
+                extended: 1, // To get video details
+                v: '5.131'
+            };
+
+            const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'video.get', params });
+            if (data.response && data.response.items.length > 0) {
+                renderCommunityVideos(data.response);
+                videoOffset += data.response.items.length; // Increment offset for next page
+            }
+        }
+
+        // --- 7. RENDERERS (One for each data type) ---
+        function renderNewsfeed(response) {
+            const { items, profiles, groups } = response;
             if (items.length === 0 && feedContainer.innerHTML === '') {
                 feedContainer.innerHTML = '<div class="text-center text-gray-400 py-10">Nothing new to show.</div>';
-                return;
             }
-
             items.forEach(item => {
-                let author = null;
-                if (item.source_id > 0) {
-                    author = profiles.find(p => p.id === item.source_id);
-                } else {
-                    author = groups.find(g => g.id === -item.source_id);
-                }
-
+                const author = (item.source_id > 0) ? profiles.find(p => p.id === item.source_id) : groups.find(g => g.id === -item.source_id);
                 if (!author) return;
+                const card = createCard(author, item.date, item);
+                if (card) feedContainer.appendChild(card);
+            });
+        }
 
-                const card = document.createElement('div');
-                card.className = 'card';
-                const postDate = new Date(item.date * 1000).toLocaleString();
-                let contentHTML = '';
+        function renderCommunityVideos(response) {
+            const groupInfo = userGroups.find(g => g.id == selectedGroupId);
+            if (response.items.length === 0 && feedContainer.innerHTML === '') {
+                feedContainer.innerHTML = '<div class="text-center text-gray-400 py-10">No videos found in this community.</div>';
+            }
+            response.items.forEach(videoItem => {
+                const card = createCard(groupInfo, videoItem.date, videoItem, true);
+                if (card) feedContainer.appendChild(card);
+            });
+        }
 
-                const renderVideo = (videoObject) => {
-                    if (videoObject.player) {
-                        return `<div class="post-video-container"><iframe src="${videoObject.player}" frameborder="0" allowfullscreen></iframe></div>`;
-                    } else if (videoObject.image) {
-                        const videoLink = `https://vk.com/video${videoObject.owner_id}_${videoObject.id}`;
-                        const bestThumbnail = videoObject.image.sort((a, b) => b.width - a.width)[0];
-                        return `<a href="${videoLink}" target="_blank" class="video-thumbnail-link"><img src="${bestThumbnail.url}" class="post-image" alt="Video thumbnail"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></div></a>`;
-                    }
-                    return '';
-                };
+        // --- 8. CARD CREATION HELPER ---
+        function createCard(author, date, item, isDirectVideo = false) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            const postDate = new Date(date * 1000).toLocaleString();
+            let contentHTML = '';
 
+            const renderVideo = (videoObject) => {
+                if (videoObject.player) {
+                    return `<div class="post-video-container"><iframe src="${videoObject.player}" frameborder="0" allowfullscreen></iframe></div>`;
+                } else if (videoObject.image || videoObject.first_frame) {
+                    const videoLink = `https://vk.com/video${videoObject.owner_id}_${videoObject.id}`;
+                    const thumbnail = videoObject.image || videoObject.first_frame;
+                    const bestThumbnail = thumbnail.sort((a, b) => b.width - a.width)[0];
+                    return `<a href="${videoLink}" target="_blank" class="video-thumbnail-link"><img src="${bestThumbnail.url}" class="video-thumbnail-image" alt="Video thumbnail"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></div></a>`;
+                }
+                return '';
+            };
+
+            if (isDirectVideo) {
+                contentHTML += `<div class="post-text">${item.title.replace(/\n/g, '<br>')}</div>`;
+                contentHTML += renderVideo(item);
+            } else { // It's a newsfeed item
                 if (item.type === 'post') {
                     if (item.text) contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
                     if (item.attachments) {
                         const photo = item.attachments.find(att => att.type === 'photo');
                         const video = item.attachments.find(att => att.type === 'video');
-                        if (photo) {
-                            const bestSize = photo.photo.sizes.sort((a, b) => b.width - a.width)[0];
-                            contentHTML += `<img src="${bestSize.url}" class="post-image" alt="Post attachment">`;
-                        } else if (video) {
-                            contentHTML += renderVideo(video.video);
-                        }
+                        if (photo) contentHTML += `<img src="${photo.photo.sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="Post attachment">`;
+                        else if (video) contentHTML += renderVideo(video.video);
                     }
                 } else if (item.type === 'photo' && item.photos) {
-                    const photoItem = item.photos.items[0];
-                    const bestSize = photoItem.sizes.sort((a, b) => b.width - a.width)[0];
-                    contentHTML += `<img src="${bestSize.url}" class="post-image" alt="New photo">`;
+                    contentHTML += `<img src="${item.photos.items[0].sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="New photo">`;
                 } else if (item.type === 'video' && item.video) {
                     contentHTML += renderVideo(item.video.items[0]);
                 }
+            }
 
-                if (contentHTML) {
-                    card.innerHTML = `<div class="card-header"><img src="${author.photo_100 || author.photo_200}" class="avatar" alt="Author avatar"><div><div class="author-name">${author.name || (author.first_name + ' ' + author.last_name)}</div><div class="post-date">${postDate}</div></div></div>${contentHTML}`;
-                    feedContainer.appendChild(card);
-                }
-            });
+            if (contentHTML) {
+                card.innerHTML = `<div class="card-header"><img src="${author.photo_50}" class="avatar" alt="Author avatar"><div><div class="author-name">${author.name}</div><div class="post-date">${postDate}</div></div></div>${contentHTML}`;
+                return card;
+            }
+            return null;
         }
 
-        // --- 7. EVENT LISTENERS ---
-        // Listen for changes on the group filter
+        // --- 9. EVENT LISTENERS ---
         groupFilter.addEventListener('change', (event) => {
             selectedGroupId = event.target.value;
-            fetchNewsfeed(true); // Trigger a new search
+            fetchContent(true);
         });
 
-        // Listen for scrolling to trigger infinite load
         window.addEventListener('scroll', () => {
-            // Check if user is near the bottom of the page
             if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && !isLoading) {
-                fetchNewsfeed(false); // Fetch more items, not a new search
+                fetchContent(false);
             }
         });
 
