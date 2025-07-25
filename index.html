@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
+    <title>VK Updates Feed</title>
+    <!-- VK Bridge: The library to interact with the VK client -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Simple styles for a clean look */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #e7e8ec;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+        }
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .author-name {
+            font-weight: 600;
+        }
+        .post-date {
+            color: #818c99;
+            font-size: 0.8rem;
+        }
+        .post-text {
+            line-height: 1.4;
+            margin-bottom: 10px;
+        }
+        .post-image {
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        /* New style for video container */
+        .post-video-container {
+            position: relative;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+            overflow: hidden;
+            max-width: 100%;
+            background: #000;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .post-video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div class="p-4 max-w-2xl mx-auto">
+        <header class="text-center mb-4">
+            <h1 class="text-2xl font-bold text-gray-800">Updates Feed</h1>
+            <p class="text-gray-500">Your chronological feed of friends and groups.</p>
+        </header>
+
+        <!-- Container for the feed items -->
+        <main id="feed-container">
+            <!-- Loading message will be shown initially -->
+            <div id="loading-message" class="text-center text-gray-500 py-10">Loading your feed...</div>
+        </main>
+    </div>
+
+    <script>
+        // IMPORTANT: Replace with your actual App ID from your VK developer settings.
+        const APP_ID = 53964096; // <-- REPLACE THIS
+
+        // --- 1. INITIALIZE THE MINI APP ---
+        vkBridge.send('VKWebAppInit');
+
+        // --- 2. AUTHENTICATION AND FETCHING DATA ---
+        async function startApp() {
+            if (APP_ID === 0) {
+                document.getElementById('loading-message').innerText = 'Error: Please set your APP_ID in the script.';
+                return;
+            }
+
+            try {
+                // Request an access token with permissions for wall, groups, and video.
+                const tokenData = await vkBridge.send('VKWebAppGetAuthToken', {
+                    app_id: APP_ID,
+                    scope: 'friends,wall,groups,video'
+                });
+
+                if (tokenData.access_token) {
+                    fetchNewsfeed(tokenData.access_token);
+                }
+            } catch (error) {
+                console.error('Auth Error:', error);
+                document.getElementById('loading-message').innerText = 'Could not get authorization.';
+            }
+        }
+
+        // --- 3. FETCH THE NEWS FEED FROM VK API ---
+        async function fetchNewsfeed(accessToken) {
+            try {
+                // Now also filtering for 'video'
+                const feedData = await vkBridge.send('VKWebAppCallAPIMethod', {
+                    method: 'newsfeed.get',
+                    params: {
+                        access_token: accessToken,
+                        filters: 'post,photo,video', // Get posts, photos, AND videos
+                        count: 50,
+                        extended: 1,
+                        v: '5.131'
+                    }
+                });
+                
+                document.getElementById('loading-message').style.display = 'none';
+                renderFeed(feedData.response);
+
+            } catch (error) {
+                console.error('API Error:', error);
+                document.getElementById('loading-message').innerText = 'Failed to load feed data.';
+            }
+        }
+
+        // --- 4. RENDER THE FEED ON THE SCREEN ---
+        function renderFeed(response) {
+            const feedContainer = document.getElementById('feed-container');
+            const { items, profiles, groups } = response;
+
+            if (items.length === 0) {
+                feedContainer.innerHTML = '<div class="text-center text-gray-500 py-10">Nothing new to show.</div>';
+                return;
+            }
+
+            items.forEach(item => {
+                let author = null;
+                if (item.source_id > 0) {
+                    author = profiles.find(p => p.id === item.source_id);
+                } else {
+                    author = groups.find(g => g.id === -item.source_id);
+                }
+
+                if (!author) return;
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                const postDate = new Date(item.date * 1000).toLocaleString();
+                let contentHTML = '';
+
+                // Handle standard posts
+                if (item.type === 'post') {
+                    if (item.text) {
+                        contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
+                    }
+                    // Check for attachments (photo or video)
+                    if (item.attachments) {
+                        const photo = item.attachments.find(att => att.type === 'photo');
+                        const video = item.attachments.find(att => att.type === 'video');
+
+                        if (photo) {
+                            const bestSize = photo.photo.sizes.sort((a, b) => b.width - a.width)[0];
+                            contentHTML += `<img src="${bestSize.url}" class="post-image" alt="Post attachment">`;
+                        } else if (video && video.video.player) {
+                            contentHTML += `
+                                <div class="post-video-container">
+                                    <iframe src="${video.video.player}" frameborder="0" allowfullscreen></iframe>
+                                </div>`;
+                        }
+                    }
+                }
+
+                // Handle direct photo uploads
+                if (item.type === 'photo') {
+                     if (item.photos && item.photos.items.length > 0) {
+                        const photoItem = item.photos.items[0];
+                        const bestSize = photoItem.sizes.sort((a, b) => b.width - a.width)[0];
+                        contentHTML += `<img src="${bestSize.url}" class="post-image" alt="New photo">`;
+                     }
+                }
+
+                // Handle direct video uploads
+                if (item.type === 'video') {
+                    if (item.video && item.video.items.length > 0) {
+                        const videoItem = item.video.items[0];
+                        if (videoItem.player) {
+                            contentHTML += `
+                                <div class="post-video-container">
+                                    <iframe src="${videoItem.player}" frameborder="0" allowfullscreen></iframe>
+                                </div>`;
+                        }
+                    }
+                }
+
+                // Combine everything into the card if there is content to show
+                if (contentHTML) {
+                    card.innerHTML = `
+                        <div class="card-header">
+                            <img src="${author.photo_100 || author.photo_200}" class="avatar" alt="Author avatar">
+                            <div>
+                                <div class="author-name">${author.name || (author.first_name + ' ' + author.last_name)}</div>
+                                <div class="post-date">${postDate}</div>
+                            </div>
+                        </div>
+                        ${contentHTML}
+                    `;
+                    feedContainer.appendChild(card);
+                }
+            });
+        }
+
+        // Start the application logic
+        startApp();
+    </script>
+</body>
+</html>
