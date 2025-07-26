@@ -9,120 +9,67 @@
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Simple styles for a clean look */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
-        /* Dark Mode Card Style */
         .card {
-            background-color: #2c2c2e; /* Dark gray for cards */
-            border: 1px solid #444;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            padding: 12px;
+            background-color: #2c2c2e; border: 1px solid #444; border-radius: 12px;
+            margin-bottom: 12px; padding: 12px;
         }
-        .card-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            margin-right: 10px;
-        }
-        .author-name {
-            font-weight: 600;
-            color: #f2f2f7; /* Light text for names */
-        }
-        .post-date {
-            color: #8d8d93; /* Muted light text for dates */
-            font-size: 0.8rem;
-        }
-        .post-text {
-            line-height: 1.4;
-            margin-bottom: 10px;
-            color: #e5e5ea; /* Main post text color */
-        }
-        .post-image, .video-thumbnail-image {
-            width: 100%;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        /* Clickable Thumbnail Style */
-        .video-thumbnail-link {
-            display: block;
-            position: relative;
-            margin-top: 10px;
-        }
+        .card-header { display: flex; align-items: center; margin-bottom: 10px; }
+        .avatar { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; }
+        .author-name { font-weight: 600; color: #f2f2f7; }
+        .post-date { color: #8d8d93; font-size: 0.8rem; }
+        .post-text { line-height: 1.4; margin-bottom: 10px; color: #e5e5ea; }
+        .post-image, .video-thumbnail-image { width: 100%; border-radius: 8px; margin-top: 10px; }
+        .video-thumbnail-link { display: block; position: relative; margin-top: 10px; }
         .video-thumbnail-link::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            transition: background-color 0.2s ease;
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.3); border-radius: 8px; transition: background-color 0.2s ease;
         }
-        .video-thumbnail-link:hover::after {
-             background: rgba(0, 0, 0, 0.1);
-        }
+        .video-thumbnail-link:hover::after { background: rgba(0, 0, 0, 0.1); }
         .play-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
-            background: rgba(0, 0, 0, 0.6);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none; /* Allows clicks to go to the link */
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 60px; height: 60px; background: rgba(0, 0, 0, 0.6); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; pointer-events: none;
         }
-        .play-icon svg {
-            fill: white;
-            width: 30px;
-            height: 30px;
-            margin-left: 4px; /* Optical alignment */
+        .play-icon svg { fill: white; width: 30px; height: 30px; margin-left: 4px; }
+        
+        /* --- NEW: Multi-select Styles --- */
+        #filter-button {
+            width: 100%; padding: 10px; border-radius: 8px; background-color: #3a3a3c;
+            color: #f2f2f7; border: 1px solid #444; text-align: left;
         }
-        /* Style for the filter dropdown */
-        #group-filter {
-            width: 100%;
-            padding: 10px;
-            border-radius: 8px;
-            background-color: #3a3a3c;
-            color: #f2f2f7;
-            border: 1px solid #444;
-        }
-        /* Style for the refresh button */
         #refresh-button {
-            background-color: #3a3a3c;
-            border: 1px solid #444;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            flex-shrink: 0; /* Prevents the button from shrinking */
+            background-color: #3a3a3c; border: 1px solid #444; border-radius: 50%; width: 40px; height: 40px;
+            display: flex; align-items: center; justify-content: center; cursor: pointer;
+            transition: background-color 0.2s ease; flex-shrink: 0;
         }
-        #refresh-button:hover {
-            background-color: #48484a;
+        #refresh-button:hover { background-color: #48484a; }
+        #refresh-button svg { fill: #f2f2f7; width: 24px; height: 24px; }
+
+        /* Modal Styles */
+        #modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7); z-index: 10;
         }
-        #refresh-button svg {
-            fill: #f2f2f7;
-            width: 24px;
-            height: 24px;
+        #modal-content {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background-color: #1c1c1e; color: white;
+            border-top-left-radius: 16px; border-top-right-radius: 16px;
+            padding: 16px; z-index: 20; max-height: 80vh; display: flex; flex-direction: column;
         }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-body { overflow-y: auto; }
+        .modal-footer { margin-top: 16px; }
+        .modal-button {
+            width: 100%; padding: 12px; border-radius: 8px; font-weight: 600;
+            background-color: #007aff; color: white;
+        }
+        .filter-option { display: flex; align-items: center; padding: 8px 0; }
+        .filter-option input { margin-right: 12px; width: 20px; height: 20px; accent-color: #007aff; }
     </style>
 </head>
 <body class="bg-black">
@@ -132,44 +79,63 @@
             <h1 class="text-2xl font-bold text-gray-100">Updates Feed</h1>
         </header>
 
-        <div id="filter-container" class="flex items-center space-x-2 mb-4">
-             <select id="group-filter" class="flex-grow hidden"></select>
+        <!-- UPDATED: Filter UI now has a button to open the modal -->
+        <div id="controls-container" class="flex items-center space-x-2 mb-4">
+             <button id="filter-button" class="flex-grow">All Feeds</button>
              <button id="refresh-button" title="Refresh Feed">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
             </button>
         </div>
 
         <main id="feed-container"></main>
-
         <div id="infinite-load-indicator" class="text-center text-gray-400 py-6 hidden">Loading more...</div>
+    </div>
+
+    <!-- NEW: Multi-select Modal -->
+    <div id="modal-overlay" class="hidden">
+        <div id="modal-content">
+            <div class="modal-header">
+                <h2 class="text-xl font-bold">Filter Feed</h2>
+                <button id="close-modal-button">&times;</button>
+            </div>
+            <div id="modal-body" class="modal-body">
+                <!-- Checkbox options will be populated here -->
+            </div>
+            <div class="modal-footer">
+                <button id="apply-filter-button" class="modal-button">Apply</button>
+            </div>
+        </div>
     </div>
 
     <script>
         // --- STATE MANAGEMENT ---
-        const APP_ID = 53964096; // Your App ID
+        const APP_ID = 53964096;
         let accessToken = null;
         let newsfeedNextFrom = '';
-        let videoOffset = 0;
         let isLoading = false;
-        let selectedGroupId = 'all'; // Default to 'all'
-        let userGroups = [];
+        let selectedSourceIds = ['all']; // Can now be an array of IDs
+        let allSources = []; // Combined list of friends and groups
 
         // --- DOM ELEMENTS ---
         const feedContainer = document.getElementById('feed-container');
         const infiniteLoadIndicator = document.getElementById('infinite-load-indicator');
-        const groupFilter = document.getElementById('group-filter');
         const refreshButton = document.getElementById('refresh-button');
+        const filterButton = document.getElementById('filter-button');
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalBody = document.getElementById('modal-body');
+        const closeModalButton = document.getElementById('close-modal-button');
+        const applyFilterButton = document.getElementById('apply-filter-button');
 
-        // --- 1. INITIALIZE THE MINI APP ---
+        // --- 1. INITIALIZE ---
         vkBridge.send('VKWebAppInit');
 
-        // --- 2. AUTHENTICATION AND INITIAL DATA FETCH ---
+        // --- 2. AUTH & START ---
         async function startApp() {
             try {
                 const tokenData = await vkBridge.send('VKWebAppGetAuthToken', { app_id: APP_ID, scope: 'friends,wall,groups,video' });
                 accessToken = tokenData.access_token;
                 if (accessToken) {
-                    await fetchUserGroups();
+                    await fetchAllSources();
                     await fetchContent(true);
                 }
             } catch (error) {
@@ -178,30 +144,36 @@
             }
         }
 
-        // --- 3. FETCH USER'S GROUPS FOR THE FILTER ---
-        async function fetchUserGroups() {
+        // --- 3. FETCH ALL SOURCES (GROUPS & FRIENDS) FOR FILTER ---
+        async function fetchAllSources() {
             try {
-                const groupsData = await vkBridge.send('VKWebAppCallAPIMethod', {
-                    method: 'groups.get',
-                    params: { access_token: accessToken, extended: 1, fields: 'name,photo_50', v: '5.131' }
-                });
-                userGroups = groupsData.response.items;
-                populateGroupFilter(userGroups);
+                const [groupsData, friendsData] = await Promise.all([
+                    vkBridge.send('VKWebAppCallAPIMethod', { method: 'groups.get', params: { access_token: accessToken, extended: 1, v: '5.131' } }),
+                    vkBridge.send('VKWebAppCallAPIMethod', { method: 'friends.get', params: { access_token: accessToken, order: 'name', fields: 'photo_50', v: '5.131' } })
+                ]);
+                
+                const groups = groupsData.response.items.map(g => ({ id: -g.id, name: g.name, photo: g.photo_50 })); // Negative ID for groups
+                const friends = friendsData.response.items.map(f => ({ id: f.id, name: `${f.first_name} ${f.last_name}`, photo: f.photo_50 }));
+                
+                allSources = [...groups, ...friends].sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
+                populateFilterModal(allSources);
+
             } catch (error) {
-                console.error('Failed to fetch groups:', error);
+                console.error('Failed to fetch sources:', error);
             }
         }
 
-        // --- 4. POPULATE THE DROPDOWN FILTER ---
-        function populateGroupFilter(groups) {
-            // NEW: Added "All Videos" option
-            groupFilter.innerHTML = `
-                <option value="all">All Feeds</option>
-                <option value="all_videos">All Videos</option>
+        // --- 4. POPULATE THE MULTI-SELECT MODAL ---
+        function populateFilterModal(sources) {
+            let optionsHTML = `
+                <div class="filter-option"><input type="radio" name="filter_mode" value="all" checked><label>All Feeds</label></div>
+                <div class="filter-option"><input type="radio" name="filter_mode" value="all_videos"><label>All Videos</label></div>
+                <hr class="border-gray-600 my-2">
             `;
-            const groupOptions = groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('');
-            groupFilter.innerHTML += groupOptions;
-            groupFilter.classList.remove('hidden');
+            sources.forEach(source => {
+                optionsHTML += `<div class="filter-option"><input type="checkbox" class="source-checkbox" value="${source.id}"><label>${source.name}</label></div>`;
+            });
+            modalBody.innerHTML = optionsHTML;
         }
         
         // --- 5. MASTER FETCH FUNCTION ---
@@ -212,7 +184,6 @@
             if (isNewSearch) {
                 feedContainer.innerHTML = '';
                 newsfeedNextFrom = '';
-                videoOffset = 0;
             }
 
             const loadingIndicator = isNewSearch ? document.createElement('div') : infiniteLoadIndicator;
@@ -225,14 +196,7 @@
             }
 
             try {
-                // UPDATED: Logic to handle the new "all_videos" mode
-                if (selectedGroupId === 'all') {
-                    await fetchNewsfeedApi();
-                } else if (selectedGroupId === 'all_videos') {
-                    await fetchVideosFeedApi();
-                } else {
-                    await fetchCommunityVideosApi();
-                }
+                await fetchNewsfeedApi();
             } catch (error) {
                 console.error('Content Fetch Error:', error);
                 feedContainer.innerHTML = '<div class="text-center text-red-400 py-10">Failed to load data.</div>';
@@ -243,10 +207,18 @@
             }
         }
 
-        // --- 6. API CALLERS ---
+        // --- 6. API CALLER (NOW HANDLES ALL CASES) ---
         async function fetchNewsfeedApi() {
-            const params = { access_token: accessToken, filters: 'post,photo,video', count: 30, extended: 1, v: '5.131' };
+            const params = { access_token: accessToken, count: 30, extended: 1, v: '5.131' };
             if (newsfeedNextFrom) params.start_from = newsfeedNextFrom;
+
+            if (selectedSourceIds.includes('all')) {
+                params.filters = 'post,photo,video';
+            } else if (selectedSourceIds.includes('all_videos')) {
+                params.filters = 'video';
+            } else {
+                params.source_ids = selectedSourceIds.join(',');
+            }
 
             const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'newsfeed.get', params });
             if (data.response) {
@@ -254,37 +226,8 @@
                 newsfeedNextFrom = data.response.next_from;
             }
         }
-        
-        // NEW: API caller specifically for the "All Videos" feed
-        async function fetchVideosFeedApi() {
-            const params = { access_token: accessToken, filters: 'video', count: 30, extended: 1, v: '5.131' };
-            if (newsfeedNextFrom) params.start_from = newsfeedNextFrom;
 
-            const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'newsfeed.get', params });
-            if (data.response) {
-                renderNewsfeed(data.response); // Can reuse the same renderer
-                newsfeedNextFrom = data.response.next_from;
-            }
-        }
-
-        async function fetchCommunityVideosApi() {
-            const params = {
-                access_token: accessToken,
-                owner_id: -parseInt(selectedGroupId),
-                count: 50,
-                offset: videoOffset,
-                extended: 1,
-                v: '5.131'
-            };
-
-            const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'video.get', params });
-            if (data.response && data.response.items.length > 0) {
-                renderCommunityVideos(data.response);
-                videoOffset += data.response.items.length;
-            }
-        }
-
-        // --- 7. RENDERERS ---
+        // --- 7. RENDERER ---
         function renderNewsfeed(response) {
             const { items, profiles, groups } = response;
             if (items.length === 0 && feedContainer.innerHTML === '') {
@@ -298,24 +241,9 @@
             });
         }
 
-        function renderCommunityVideos(response) {
-            const groupInfo = userGroups.find(g => g.id == selectedGroupId);
-            if (response.items.length === 0 && feedContainer.innerHTML === '') {
-                feedContainer.innerHTML = '<div class="text-center text-gray-400 py-10">No videos found in this community.</div>';
-            }
-            response.items.forEach(videoItem => {
-                const card = createCard(groupInfo, videoItem.date, videoItem, true);
-                if (card) feedContainer.appendChild(card);
-            });
-        }
-
         // --- 8. CARD CREATION HELPER ---
-        function createCard(author, date, item, isDirectVideo = false) {
-            if (!author) {
-                console.warn("Could not find author for item:", item);
-                return null;
-            }
-
+        function createCard(author, date, item) {
+            if (!author) return null;
             const card = document.createElement('div');
             card.className = 'card';
             const postDate = new Date(date * 1000).toLocaleString();
@@ -331,25 +259,18 @@
                 return '';
             };
 
-            if (isDirectVideo) {
-                if (item.title) {
-                    contentHTML += `<div class="post-text">${item.title.replace(/\n/g, '<br>')}</div>`;
+            if (item.type === 'post') {
+                if (item.text) contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
+                if (item.attachments) {
+                    const photo = item.attachments.find(att => att.type === 'photo');
+                    const video = item.attachments.find(att => att.type === 'video');
+                    if (photo) contentHTML += `<img src="${photo.photo.sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="Post attachment">`;
+                    else if (video) contentHTML += renderVideo(video.video);
                 }
-                contentHTML += renderVideo(item);
-            } else {
-                if (item.type === 'post') {
-                    if (item.text) contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
-                    if (item.attachments) {
-                        const photo = item.attachments.find(att => att.type === 'photo');
-                        const video = item.attachments.find(att => att.type === 'video');
-                        if (photo) contentHTML += `<img src="${photo.photo.sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="Post attachment">`;
-                        else if (video) contentHTML += renderVideo(video.video);
-                    }
-                } else if (item.type === 'photo' && item.photos) {
-                    contentHTML += `<img src="${item.photos.items[0].sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="New photo">`;
-                } else if (item.type === 'video' && item.video) {
-                    contentHTML += renderVideo(item.video.items[0]);
-                }
+            } else if (item.type === 'photo' && item.photos) {
+                contentHTML += `<img src="${item.photos.items[0].sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="New photo">`;
+            } else if (item.type === 'video' && item.video) {
+                contentHTML += renderVideo(item.video.items[0]);
             }
 
             if (contentHTML) {
@@ -368,19 +289,36 @@
         }
 
         // --- 9. EVENT LISTENERS ---
-        groupFilter.addEventListener('change', (event) => {
-            selectedGroupId = event.target.value;
+        const toggleModal = (show) => modalOverlay.classList.toggle('hidden', !show);
+        
+        filterButton.addEventListener('click', () => toggleModal(true));
+        closeModalButton.addEventListener('click', () => toggleModal(false));
+        modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) toggleModal(false); });
+
+        applyFilterButton.addEventListener('click', () => {
+            const checkedRadio = modalBody.querySelector('input[name="filter_mode"]:checked');
+            const checkedBoxes = Array.from(modalBody.querySelectorAll('.source-checkbox:checked'));
+            
+            if (checkedBoxes.length > 0) {
+                // If any checkbox is selected, they take priority
+                selectedSourceIds = checkedBoxes.map(box => box.value);
+                filterButton.textContent = `${selectedSourceIds.length} source(s) selected`;
+            } else {
+                // Otherwise, use the radio button selection
+                selectedSourceIds = [checkedRadio.value];
+                filterButton.textContent = checkedRadio.nextElementSibling.textContent;
+            }
+            
+            toggleModal(false);
             fetchContent(true);
         });
+
+        refreshButton.addEventListener('click', () => fetchContent(true));
 
         window.addEventListener('scroll', () => {
             if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && !isLoading) {
                 fetchContent(false);
             }
-        });
-
-        refreshButton.addEventListener('click', () => {
-            fetchContent(true);
         });
 
         // Start the application
