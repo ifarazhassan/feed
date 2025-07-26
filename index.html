@@ -273,10 +273,9 @@
 
         // --- 8. CARD CREATION HELPER ---
         function createCard(author, date, item, isDirectVideo = false) {
-            // **FIX:** Add a guard clause to prevent errors if author is not found.
             if (!author) {
                 console.warn("Could not find author for item:", item);
-                return null; // Don't create a card if there's no author.
+                return null;
             }
 
             const card = document.createElement('div');
@@ -295,7 +294,10 @@
             };
 
             if (isDirectVideo) {
-                contentHTML += `<div class="post-text">${item.title.replace(/\n/g, '<br>')}</div>`;
+                // **FIX:** Add a check to ensure the video has a title before trying to display it.
+                if (item.title) {
+                    contentHTML += `<div class="post-text">${item.title.replace(/\n/g, '<br>')}</div>`;
+                }
                 contentHTML += renderVideo(item);
             } else {
                 if (item.type === 'post') {
