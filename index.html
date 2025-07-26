@@ -102,14 +102,38 @@
             border: 1px solid #444;
             margin-bottom: 16px;
         }
+        /* NEW: Style for the refresh button */
+        #refresh-button {
+            background-color: #3a3a3c;
+            border: 1px solid #444;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        #refresh-button:hover {
+            background-color: #48484a;
+        }
+        #refresh-button svg {
+            fill: #f2f2f7;
+            width: 24px;
+            height: 24px;
+        }
     </style>
 </head>
 <body class="bg-black">
 
     <div class="p-4 max-w-2xl mx-auto">
-        <header class="text-center mb-4">
+        <!-- UPDATED: Header now includes refresh button and no subtitle -->
+        <header class="flex justify-between items-center mb-4">
             <h1 class="text-2xl font-bold text-gray-100">Updates Feed</h1>
-            <p class="text-gray-400">Your chronological feed of friends and groups.</p>
+            <button id="refresh-button" title="Refresh Feed">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
         </header>
 
         <div id="filter-container">
@@ -135,6 +159,7 @@
         const feedContainer = document.getElementById('feed-container');
         const infiniteLoadIndicator = document.getElementById('infinite-load-indicator');
         const groupFilter = document.getElementById('group-filter');
+        const refreshButton = document.getElementById('refresh-button'); // NEW
 
         // --- 1. INITIALIZE THE MINI APP ---
         vkBridge.send('VKWebAppInit');
@@ -142,7 +167,7 @@
         // --- 2. AUTHENTICATION AND INITIAL DATA FETCH ---
         async function startApp() {
             try {
-                await vkBridge.send("VKWebAppSetViewSettings", { "pull_to_refresh": "enabled" });
+                // REMOVED: Pull-to-refresh is no longer enabled
                 const tokenData = await vkBridge.send('VKWebAppGetAuthToken', { app_id: APP_ID, scope: 'friends,wall,groups,video' });
                 accessToken = tokenData.access_token;
                 if (accessToken) {
@@ -294,7 +319,6 @@
             };
 
             if (isDirectVideo) {
-                // **FIX:** Add a check to ensure the video has a title before trying to display it.
                 if (item.title) {
                     contentHTML += `<div class="post-text">${item.title.replace(/\n/g, '<br>')}</div>`;
                 }
@@ -334,13 +358,12 @@
             }
         });
 
-        // --- 10. PULL-TO-REFRESH LISTENER ---
-        vkBridge.subscribe(async (e) => {
-            if (e.detail.type === 'VKWebAppUpdateConfig') {
-                await fetchContent(true);
-                await vkBridge.send("VKWebAppStopPullToRefresh");
-            }
+        // NEW: Refresh button listener
+        refreshButton.addEventListener('click', () => {
+            fetchContent(true);
         });
+
+        // REMOVED: The pull-to-refresh listener is no longer needed.
 
         // Start the application
         startApp();
