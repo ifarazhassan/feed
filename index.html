@@ -160,6 +160,9 @@
         // --- 2. AUTHENTICATION AND INITIAL DATA FETCH ---
         async function startApp() {
             try {
+                // NEW: Enable the native pull-to-refresh gesture
+                await vkBridge.send("VKWebAppSetViewSettings", { "pull_to_refresh": "enabled" });
+
                 const tokenData = await vkBridge.send('VKWebAppGetAuthToken', { app_id: APP_ID, scope: 'friends,wall,groups,video' });
                 accessToken = tokenData.access_token;
                 if (accessToken) {
@@ -209,7 +212,6 @@
                 videoOffset = 0; // Reset video pagination
             }
 
-            // Show appropriate loading indicator
             const loadingIndicator = isNewSearch ? document.createElement('div') : infiniteLoadIndicator;
             if (isNewSearch) {
                 loadingIndicator.className = 'text-center text-gray-400 py-10';
@@ -250,21 +252,21 @@
         async function fetchCommunityVideosApi() {
             const params = {
                 access_token: accessToken,
-                owner_id: -parseInt(selectedGroupId), // Negative ID for communities
+                owner_id: -parseInt(selectedGroupId),
                 count: 50,
                 offset: videoOffset,
-                extended: 1, // To get video details
+                extended: 1,
                 v: '5.131'
             };
 
             const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'video.get', params });
             if (data.response && data.response.items.length > 0) {
                 renderCommunityVideos(data.response);
-                videoOffset += data.response.items.length; // Increment offset for next page
+                videoOffset += data.response.items.length;
             }
         }
 
-        // --- 7. RENDERERS (One for each data type) ---
+        // --- 7. RENDERERS ---
         function renderNewsfeed(response) {
             const { items, profiles, groups } = response;
             if (items.length === 0 && feedContainer.innerHTML === '') {
@@ -311,7 +313,7 @@
             if (isDirectVideo) {
                 contentHTML += `<div class="post-text">${item.title.replace(/\n/g, '<br>')}</div>`;
                 contentHTML += renderVideo(item);
-            } else { // It's a newsfeed item
+            } else {
                 if (item.type === 'post') {
                     if (item.text) contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
                     if (item.attachments) {
@@ -343,6 +345,15 @@
         window.addEventListener('scroll', () => {
             if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 500 && !isLoading) {
                 fetchContent(false);
+            }
+        });
+
+        // --- 10. PULL-TO-REFRESH LISTENER ---
+        vkBridge.subscribe(async (e) => {
+            if (e.detail.type === 'VKWebAppUpdateConfig') {
+                // User has pulled down to refresh
+                await fetchContent(true); // Re-fetch all content from the start
+                await vkBridge.send("VKWebAppStopPullToRefresh"); // Stop the animation
             }
         });
 
