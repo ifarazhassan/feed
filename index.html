@@ -128,12 +128,10 @@
 <body class="bg-black">
 
     <div class="p-4 max-w-2xl mx-auto">
-        <!-- UPDATED: Header is now simpler -->
         <header class="text-center mb-4">
             <h1 class="text-2xl font-bold text-gray-100">Updates Feed</h1>
         </header>
 
-        <!-- UPDATED: Filter container now holds the dropdown and refresh button -->
         <div id="filter-container" class="flex items-center space-x-2 mb-4">
              <select id="group-filter" class="flex-grow hidden"></select>
              <button id="refresh-button" title="Refresh Feed">
@@ -150,10 +148,10 @@
         // --- STATE MANAGEMENT ---
         const APP_ID = 53964096; // Your App ID
         let accessToken = null;
-        let newsfeedNextFrom = ''; // Cursor for newsfeed.get
-        let videoOffset = 0; // Offset for video.get
+        let newsfeedNextFrom = '';
+        let videoOffset = 0;
         let isLoading = false;
-        let selectedGroupId = 'all';
+        let selectedGroupId = 'all'; // Default to 'all'
         let userGroups = [];
 
         // --- DOM ELEMENTS ---
@@ -196,13 +194,13 @@
 
         // --- 4. POPULATE THE DROPDOWN FILTER ---
         function populateGroupFilter(groups) {
-            groupFilter.innerHTML = '<option value="all">All Feeds</option>';
-            groups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name;
-                groupFilter.appendChild(option);
-            });
+            // NEW: Added "All Videos" option
+            groupFilter.innerHTML = `
+                <option value="all">All Feeds</option>
+                <option value="all_videos">All Videos</option>
+            `;
+            const groupOptions = groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('');
+            groupFilter.innerHTML += groupOptions;
             groupFilter.classList.remove('hidden');
         }
         
@@ -227,8 +225,11 @@
             }
 
             try {
+                // UPDATED: Logic to handle the new "all_videos" mode
                 if (selectedGroupId === 'all') {
                     await fetchNewsfeedApi();
+                } else if (selectedGroupId === 'all_videos') {
+                    await fetchVideosFeedApi();
                 } else {
                     await fetchCommunityVideosApi();
                 }
@@ -250,6 +251,18 @@
             const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'newsfeed.get', params });
             if (data.response) {
                 renderNewsfeed(data.response);
+                newsfeedNextFrom = data.response.next_from;
+            }
+        }
+        
+        // NEW: API caller specifically for the "All Videos" feed
+        async function fetchVideosFeedApi() {
+            const params = { access_token: accessToken, filters: 'video', count: 30, extended: 1, v: '5.131' };
+            if (newsfeedNextFrom) params.start_from = newsfeedNextFrom;
+
+            const data = await vkBridge.send('VKWebAppCallAPIMethod', { method: 'newsfeed.get', params });
+            if (data.response) {
+                renderNewsfeed(data.response); // Can reuse the same renderer
                 newsfeedNextFrom = data.response.next_from;
             }
         }
@@ -340,7 +353,6 @@
             }
 
             if (contentHTML) {
-                // UPDATED: Author name and date are now on the same line.
                 card.innerHTML = `
                     <div class="card-header">
                         <img src="${author.photo_50}" class="avatar" alt="Author avatar">
