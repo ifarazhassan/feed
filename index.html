@@ -273,22 +273,25 @@
 
         // --- 8. CARD CREATION HELPER ---
         function createCard(author, date, item, isDirectVideo = false) {
+            // **FIX:** Add a guard clause to prevent errors if author is not found.
+            if (!author) {
+                console.warn("Could not find author for item:", item);
+                return null; // Don't create a card if there's no author.
+            }
+
             const card = document.createElement('div');
             card.className = 'card';
             const postDate = new Date(date * 1000).toLocaleString();
             let contentHTML = '';
 
-            // UPDATED: This function now ONLY creates a clickable thumbnail.
             const renderVideo = (videoObject) => {
-                // Check if there is an image thumbnail available for the video
                 if (videoObject.image || videoObject.first_frame) {
                     const videoLink = `https://vk.com/video${videoObject.owner_id}_${videoObject.id}`;
-                    // Use 'image' for newsfeed videos, 'first_frame' for direct video.get results
                     const thumbnail = videoObject.image || videoObject.first_frame;
                     const bestThumbnail = thumbnail.sort((a, b) => b.width - a.width)[0];
                     return `<a href="${videoLink}" target="_blank" class="video-thumbnail-link"><img src="${bestThumbnail.url}" class="video-thumbnail-image" alt="Video thumbnail"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></div></a>`;
                 }
-                return ''; // Return empty if no thumbnail is available
+                return '';
             };
 
             if (isDirectVideo) {
