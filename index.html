@@ -52,24 +52,6 @@
             border-radius: 8px;
             margin-top: 10px;
         }
-        /* Video Container Styles */
-        .post-video-container {
-            position: relative;
-            padding-bottom: 56.25%; /* 16:9 aspect ratio */
-            height: 0;
-            overflow: hidden;
-            max-width: 100%;
-            background: #000;
-            border-radius: 8px;
-            margin-top: 10px;
-        }
-        .post-video-container iframe {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
         /* Clickable Thumbnail Style */
         .video-thumbnail-link {
             display: block;
@@ -160,9 +142,7 @@
         // --- 2. AUTHENTICATION AND INITIAL DATA FETCH ---
         async function startApp() {
             try {
-                // NEW: Enable the native pull-to-refresh gesture
                 await vkBridge.send("VKWebAppSetViewSettings", { "pull_to_refresh": "enabled" });
-
                 const tokenData = await vkBridge.send('VKWebAppGetAuthToken', { app_id: APP_ID, scope: 'friends,wall,groups,video' });
                 accessToken = tokenData.access_token;
                 if (accessToken) {
@@ -201,15 +181,15 @@
             groupFilter.classList.remove('hidden');
         }
         
-        // --- 5. MASTER FETCH FUNCTION (Decides which API to call) ---
+        // --- 5. MASTER FETCH FUNCTION ---
         async function fetchContent(isNewSearch = false) {
             if (isLoading) return;
             isLoading = true;
 
             if (isNewSearch) {
-                feedContainer.innerHTML = ''; // Clear previous content
-                newsfeedNextFrom = ''; // Reset newsfeed pagination
-                videoOffset = 0; // Reset video pagination
+                feedContainer.innerHTML = '';
+                newsfeedNextFrom = '';
+                videoOffset = 0;
             }
 
             const loadingIndicator = isNewSearch ? document.createElement('div') : infiniteLoadIndicator;
@@ -298,16 +278,17 @@
             const postDate = new Date(date * 1000).toLocaleString();
             let contentHTML = '';
 
+            // UPDATED: This function now ONLY creates a clickable thumbnail.
             const renderVideo = (videoObject) => {
-                if (videoObject.player) {
-                    return `<div class="post-video-container"><iframe src="${videoObject.player}" frameborder="0" allowfullscreen></iframe></div>`;
-                } else if (videoObject.image || videoObject.first_frame) {
+                // Check if there is an image thumbnail available for the video
+                if (videoObject.image || videoObject.first_frame) {
                     const videoLink = `https://vk.com/video${videoObject.owner_id}_${videoObject.id}`;
+                    // Use 'image' for newsfeed videos, 'first_frame' for direct video.get results
                     const thumbnail = videoObject.image || videoObject.first_frame;
                     const bestThumbnail = thumbnail.sort((a, b) => b.width - a.width)[0];
                     return `<a href="${videoLink}" target="_blank" class="video-thumbnail-link"><img src="${bestThumbnail.url}" class="video-thumbnail-image" alt="Video thumbnail"><div class="play-icon"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></div></a>`;
                 }
-                return '';
+                return ''; // Return empty if no thumbnail is available
             };
 
             if (isDirectVideo) {
@@ -351,9 +332,8 @@
         // --- 10. PULL-TO-REFRESH LISTENER ---
         vkBridge.subscribe(async (e) => {
             if (e.detail.type === 'VKWebAppUpdateConfig') {
-                // User has pulled down to refresh
-                await fetchContent(true); // Re-fetch all content from the start
-                await vkBridge.send("VKWebAppStopPullToRefresh"); // Stop the animation
+                await fetchContent(true);
+                await vkBridge.send("VKWebAppStopPullToRefresh");
             }
         });
 
