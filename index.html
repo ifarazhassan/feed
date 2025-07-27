@@ -37,7 +37,6 @@
         }
         .play-icon svg { fill: white; width: 30px; height: 30px; margin-left: 4px; }
         
-        /* --- UPDATED: Filter & Control Styles --- */
         #filter-button {
             width: 100%; padding: 10px; border-radius: 8px; background-color: #3a3a3c;
             color: #f2f2f7; border: 1px solid #444; text-align: left;
@@ -50,7 +49,6 @@
         #refresh-button:hover { background-color: #48484a; }
         #refresh-button svg { fill: #f2f2f7; width: 24px; height: 24px; }
 
-        /* Modal Styles */
         #modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: rgba(0,0,0,0.7); z-index: 10;
@@ -86,7 +84,6 @@
         <div id="infinite-load-indicator" class="text-center text-gray-400 py-6 hidden">Loading more...</div>
     </div>
 
-    <!-- UPDATED: Simplified Filter Modal -->
     <div id="modal-overlay" class="hidden">
         <div id="modal-content">
             <div class="modal-header">
@@ -108,7 +105,7 @@
         let accessToken = null;
         let newsfeedNextFrom = '';
         let isLoading = false;
-        let selectedFilter = 'post,photo,video'; // Default filter
+        let selectedFilter = 'post,photo,video';
 
         // --- DOM ELEMENTS ---
         const feedContainer = document.getElementById('feed-container');
@@ -206,19 +203,36 @@
                 return '';
             };
 
+            const renderPhoto = (photoObject) => {
+                const bestSize = photoObject.sizes.sort((a,b)=>b.width-a.width)[0];
+                return `<img src="${bestSize.url}" class="post-image" alt="Post attachment">`;
+            };
+
+            // **UPDATED LOGIC STARTS HERE**
             if (item.type === 'post') {
                 if (item.text) contentHTML += `<div class="post-text">${item.text.replace(/\n/g, '<br>')}</div>`;
                 if (item.attachments) {
-                    const photo = item.attachments.find(att => att.type === 'photo');
-                    const video = item.attachments.find(att => att.type === 'video');
-                    if (photo) contentHTML += `<img src="${photo.photo.sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="Post attachment">`;
-                    else if (video) contentHTML += renderVideo(video.video);
+                    // Loop through ALL attachments
+                    item.attachments.forEach(att => {
+                        if (att.type === 'photo') {
+                            contentHTML += renderPhoto(att.photo);
+                        } else if (att.type === 'video') {
+                            contentHTML += renderVideo(att.video);
+                        }
+                    });
                 }
             } else if (item.type === 'photo' && item.photos) {
-                contentHTML += `<img src="${item.photos.items[0].sizes.sort((a,b)=>b.width-a.width)[0].url}" class="post-image" alt="New photo">`;
+                // Loop through ALL photos in a photo update
+                item.photos.items.forEach(photoItem => {
+                    contentHTML += renderPhoto(photoItem);
+                });
             } else if (item.type === 'video' && item.video) {
-                contentHTML += renderVideo(item.video.items[0]);
+                // Loop through ALL videos in a video update
+                item.video.items.forEach(videoItem => {
+                    contentHTML += renderVideo(videoItem);
+                });
             }
+            // **UPDATED LOGIC ENDS HERE**
 
             if (contentHTML) {
                 card.innerHTML = `
